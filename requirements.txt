@@ -1,0 +1,8 @@
+# Non-Spark side: report_cli.py + report_dashboard.py
+# (the Spark job itself uses environment.yml / conda-pack, not this file)
+python-dotenv
+psycopg2-binary
+pandas
+sqlalchemy
+streamlit
+plotly
