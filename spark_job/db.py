@@ -83,10 +83,13 @@ def _get_or_create_keys(cur, dim):
 
 def write_batch_to_postgres(batch_df, batch_id):
     batch_df = batch_df.dropDuplicates(["id"])
-    rows = batch_df.collect()
+    batch_df.foreachPartition(_process_partition)
+
+def _process_partition(partition):
+    rows = list(partition)
     if not rows:
         return
-
+ 
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -94,7 +97,7 @@ def write_batch_to_postgres(batch_df, batch_id):
             for name, dim in _DIMENSIONS.items():
                 dim = dict(dim, rows={tuple(r[f] for f in dim["row_fields"]) for r in rows})
                 keys_by_dim[name] = _get_or_create_keys(cur, dim)
-
+ 
             fact_values = []
             for r in rows:
                 fact_values.append((
@@ -108,10 +111,10 @@ def write_batch_to_postgres(batch_df, batch_id):
                     r["ip"],
                     r["event_hour"],
                 ))
-
+ 
             execute_values(cur, _FACT_INSERT_SQL, fact_values, page_size=1000)
         conn.commit()
-        print(f"[batch {batch_id}] upserted {len(fact_values)} rows into glamira.fact_product_view")
+        print(f"[partition] upserted {len(fact_values)} rows into glamira.fact_product_view")
     except Exception:
         conn.rollback()
         raise
